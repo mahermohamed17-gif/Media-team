@@ -1,0 +1,72 @@
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>منصة تاسكات الميديا</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&family=Tajawal&family=Amiri&family=Lalezar&family=Reem+Kufi&family=Almarai&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fff;--fg:#1a1a2e;--card:#f3f3fa;--mut:#666;--ac:#6c3fe0;--ok:#0a8f4e;--bad:#d33;--br:#ddd}
+@media(prefers-color-scheme:dark){:root{--bg:#14141f;--fg:#eee;--card:#1f1f2e;--mut:#aaa;--ac:#9b7bff;--br:#333;--ok:#3ddc84;--bad:#ff6b6b}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.7 Cairo,system-ui,sans-serif}#app{max-width:760px;margin:auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--br);border-radius:14px;padding:14px;margin:10px 0}.mut{color:var(--mut);font-size:14px}.tag{background:var(--ac);color:#fff;border-radius:99px;padding:0 10px;font-size:12px}.ok{color:var(--ok)}.bad{color:var(--bad)}
+button{background:var(--ac);color:#fff;border:0;border-radius:10px;padding:9px 14px;font:inherit;cursor:pointer;margin:3px}button.s{background:none;color:var(--fg);border:1px solid var(--br)}button.r{background:var(--bad)}
+input,textarea,select{width:100%;box-sizing:border-box;background:var(--bg);color:var(--fg);border:1px solid var(--br);border-radius:10px;padding:9px;font:inherit;margin:4px 0}input[type=range],input[type=color],input[type=checkbox]{width:auto}
+.bar{height:10px;background:var(--br);border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+</style></head><body><div id="app">جاري التحميل...</div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="config.js"></script><script src="tasks.js"></script><script src="lab.js"></script>
+<script>
+firebase.initializeApp(firebaseConfig);const auth=firebase.auth(),db=firebase.firestore(),TS=firebase.firestore.FieldValue.serverTimestamp;
+const COL=["أحمر","أزرق","أخضر","برتقالي","بنفسجي","أصفر","وردي","تركواز"],WRD=["بداية","طاقة","نبض","لمسة","حلم","شرارة","خطوة","بصمة"];
+const h=s=>{let x=0;for(const c of String(s))x=(x*31+c.charCodeAt(0))>>>0;return x};
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const lnk=u=>/^https?:\/\//i.test(u||"")?`<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>`:esc(u||"—");
+const ms=x=>x&&x.toMillis?x.toMillis():0,app=document.getElementById("app");
+let U,admin,me,subs={},grades={},users={},asubs={},agr={},open=null,sel=null,pasted={},blur=0;
+addEventListener("blur",()=>{if(open!==null)blur++});
+document.addEventListener("paste",e=>{if(e.target.id==="y"&&open!==null)pasted[open]=1});
+auth.onAuthStateChanged(async u=>{U=u;if(!u){app.innerHTML=`<div class=card><h2>منصة تاسكات الميديا</h2><button onclick="auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())">دخول بحساب Google</button></div>`;return}
+ admin=ADMIN_EMAILS.includes(u.email);admin?startAdmin():startMember()});
+const render=()=>{if(!U||(document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)))return;admin?rAdmin():rMember()};
+async function startMember(){
+ const em=U.email.toLowerCase(),a=await db.doc("allowed/"+em).get().catch(()=>null);
+ if(!a||!a.exists){app.innerHTML=`<div class=card>إيميلك مش مضاف. ابعت للأدمن: <b>${esc(em)}</b></div>`;return}
+ const r=db.doc("users/"+U.uid);if(!(await r.get()).exists)await r.set({name:U.displayName||em,email:em,unlocked:1});
+ r.onSnapshot(d=>{me=d.data();render()});
+ db.collection("subs").where("uid","==",U.uid).onSnapshot(q=>{subs={};q.forEach(d=>subs[d.data().task]=d.data());render()});
+ db.collection("grades").where("uid","==",U.uid).onSnapshot(q=>{grades={};q.forEach(d=>grades[d.data().task]=d.data());render()});
+}
+function rMember(){if(!me)return;const n=me.unlocked||1,done=T.filter((_,i)=>grades[i]?.state=="ok").length;
+ let o=`<h1>أهلا ${esc(me.name)} 👋</h1><div class=mut>خلّصت ${done} من ${T.length}</div><div class=bar><i style="width:${done/T.length*100}%"></i></div>${me.flag?"<div class='card bad'>الأدمن محتاج يقعد معاك يراجع شغلك.</div>":""}`;
+ for(let i=0;i<Math.min(n,T.length);i++){const t=T[i],e=subs[i]||{},g=grades[i],st=g?.state=="ok"?`<span class=ok>✔ ${g.score}/10</span>`:g?.state=="redo"?`<span class=bad>↺ إعادة</span>`:e.submittedAt?"⏳ قيد المراجعة":"";
+  o+=`<div class=card><span class=tag>${t[0]}</span> <b>${i+1}. ${t[1]}</b> ${st}`;
+  if(open===i){o+=`<p>${t[2]}</p><p class=mut>التويست بتاعك: لون <b>${COL[h(U.uid+i)%8]}</b> وكلمة <b>${WRD[h(i+U.uid)%8]}</b> لازم يظهروا في شغلك.</p>${t[5]?"<div class=card id=lab></div>":""}${g?.note?`<p class=bad>ملاحظة الأدمن: ${esc(g.note)}</p>`:""}`;
+   if(g?.state!="ok")o+=`<input id=f placeholder="رابط الشغل النهائي" value="${esc(e.final)}"><input id=w placeholder="رابط مراحل التنفيذ (سكرين شوتس / ملف مفتوح / تسجيل شاشة)" value="${esc(e.wip)}"><textarea id=y rows=4 placeholder="اشرح بكلامك: ${esc(t[4])} (3 قرارات خدتها)">${esc(e.why)}</textarea><button onclick="sub(${i})">تسليم</button>`}
+  else o+=`<br><button class=s onclick="op(${i})">فتح</button>`;o+="</div>"}
+ app.innerHTML=o;if(open!==null&&T[open][5])Labs[T[open][5]](document.getElementById("lab"));
+}
+function op(i){open=i;blur=0;if(!subs[i]?.startedAt)db.doc(`subs/${U.uid}_${i}`).set({uid:U.uid,task:i,startedAt:TS()},{merge:true});render()}
+function sub(i){const f=$f("f"),w=$f("w"),y=$f("y");if(!f||!y)return alert("لازم رابط الشغل والشرح");
+ db.doc(`subs/${U.uid}_${i}`).set({uid:U.uid,final:f,wip:w,why:y,submittedAt:TS(),blur:(subs[i]?.blur||0)+blur,pasted:!!pasted[i]},{merge:true});open=null}
+const $f=id=>document.getElementById(id).value.trim();
+// ---------- admin ----------
+function startAdmin(){
+ db.collection("users").onSnapshot(q=>{users={};q.forEach(d=>users[d.id]=d.data());render()});
+ db.collection("subs").onSnapshot(q=>{asubs={};q.forEach(d=>{const x=d.data();(asubs[x.uid]=asubs[x.uid]||{})[x.task]=x});render()});
+ db.collection("grades").onSnapshot(q=>{agr={};q.forEach(d=>{const x=d.data();(agr[x.uid]=agr[x.uid]||{})[x.task]=x});render()});
+}
+function auto(u,i){const e=asubs[u]?.[i];if(!e?.submittedAt)return[];const f=[],m=(ms(e.submittedAt)-ms(e.startedAt))/6e4;
+ if(m<T[i][3]*.5)f.push("⚠ سلّم أسرع بكتير من المتوقع");if(!e.wip)f.push("⚠ مفيش إثبات تنفيذ");if(e.pasted)f.push("⚠ الشرح اتلصق");if(e.blur>6)f.push("⚠ خرج من الصفحة "+e.blur+" مرة");return f}
+function rAdmin(){if(sel)return det(sel);
+ let o=`<h1>لوحة الأدمن</h1><div class=card><input id=ne placeholder="إيميل Gmail للعضو الجديد"><button onclick="addM()">إضافة عضو</button></div>`;
+ for(const [id,u] of Object.entries(users)){const g=agr[id]||{},d=Object.values(g).filter(x=>x.state=="ok").length,fl=u.flag||Object.keys(asubs[id]||{}).some(i=>auto(id,+i).length),pend=Object.keys(asubs[id]||{}).filter(i=>asubs[id][i].submittedAt&&!g[i]).length;
+  o+=`<div class=card><b>${esc(u.name)}</b> ${fl?"🚩":""}<div class=mut>معتمد ${d}/${T.length} · مفتوح ${u.unlocked} · بانتظار مراجعتك ${pend}</div><div class=bar><i style="width:${d/T.length*100}%"></i></div><button onclick="sel='${id}';render()">مراجعة</button></div>`}
+ app.innerHTML=o}
+const addM=()=>{const e=ne.value.trim().toLowerCase();if(e)db.doc("allowed/"+e).set({at:TS()}).then(()=>{ne.value="";alert("تمت الإضافة")})};
+function det(u){const s=asubs[u]||{},g=agr[u]||{},us=users[u];
+ let o=`<button class=s onclick="sel=null;render()">← رجوع</button><h2>${esc(us.name)}</h2><div class=card><label><input type=checkbox id=fl ${us.flag?"checked":""} onchange="db.doc('users/${u}').update({flag:fl.checked})"> اشتباه غش</label> <button class=s onclick="db.doc('users/${u}').update({unlocked:${(us.unlocked||1)+1}})">فتح تاسك إضافي</button></div>`;
+ for(let i=0;i<T.length;i++){const e=s[i];if(!e?.submittedAt)continue;const gr=g[i]||{};
+  o+=`<div class=card><b>${i+1}. ${T[i][1]}</b> ${gr.state=="ok"?"✔":gr.state=="redo"?"↺":"جديد"}<div>الشغل: ${lnk(e.final)}</div><div>التنفيذ: ${lnk(e.wip)}</div><div>الوقت: ${Math.round((ms(e.submittedAt)-ms(e.startedAt))/6e4)} د (متوقع ${T[i][3]})</div><p>${esc(e.why)}</p>${auto(u,i).map(x=>`<div class=bad>${x}</div>`).join("")}<div class=mut>اسأله شفهيا: ${T[i][4]} — واطلب يفتح الملف الأصلي قدامك</div><input id=sc${i} type=number min=0 max=10 placeholder="الدرجة /10" value="${gr.score??""}"><input id=nt${i} placeholder="ملاحظة" value="${esc(gr.note)}"><button onclick="gr('${u}',${i},'ok')">اعتماد وفتح التالي</button><button class=r onclick="gr('${u}',${i},'redo')">إعادة</button></div>`}
+ app.innerHTML=o}
+function gr(u,i,st){db.doc(`grades/${u}_${i}`).set({uid:u,task:i,state:st,score:+document.getElementById("sc"+i).value||0,note:document.getElementById("nt"+i).value});
+ if(st=="ok")db.doc("users/"+u).update({unlocked:Math.max(users[u].unlocked||1,i+2)})}
+</script></body></html>
